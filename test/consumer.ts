@@ -41,6 +41,7 @@ describe('Consumer', () => {
   let clock;
   let handleMessage;
   let handleMessageBatch;
+  let stopPollerGate;
   let sqs;
   const response = {
     Messages: [{
@@ -54,6 +55,7 @@ describe('Consumer', () => {
     clock = sinon.useFakeTimers();
     handleMessage = sandbox.stub().resolves(null);
     handleMessageBatch = sandbox.stub().resolves(null);
+    stopPollerGate = sandbox.stub().resolves(null);
     sqs = sandbox.mock();
     sqs.receiveMessage = stubResolve(response);
     sqs.deleteMessage = stubResolve();
@@ -749,6 +751,64 @@ describe('Consumer', () => {
     it('returns false if the consumer is not polling', () => {
       consumer.start();
       consumer.stop();
+      assert.isFalse(consumer.isRunning);
+    });
+  });
+
+  describe('stopPollerGate', () => {
+    it('calls stopPollerGate', async () => {
+      consumer = new Consumer({
+        queueUrl: 'some-queue-url',
+        region: 'some-region',
+        handleMessage,
+        stopPollerGate,
+        sqs
+      });
+
+      stopPollerGate.resolves(true);
+
+      consumer.start();
+      await clock.runToLastAsync();
+      consumer.stop();
+
+      sandbox.assert.called(stopPollerGate);
+    });
+
+    it('calls handleMessage and does not stop the consumer if stopPollerGate returns false', async () => {
+      consumer = new Consumer({
+        queueUrl: 'some-queue-url',
+        region: 'some-region',
+        handleMessage,
+        stopPollerGate,
+        sqs
+      });
+
+      stopPollerGate.resolves(false);
+
+      consumer.start();
+      await clock.runToLastAsync();
+
+      sandbox.assert.called(handleMessage);
+      assert.isTrue(consumer.isRunning);
+
+      consumer.stop();
+    });
+
+    it('does not call handleMessage and stops the consumer if stopPollerGate returns true', async () => {
+      consumer = new Consumer({
+        queueUrl: 'some-queue-url',
+        region: 'some-region',
+        handleMessage,
+        stopPollerGate,
+        sqs
+      });
+
+      stopPollerGate.resolves(true);
+
+      consumer.start();
+      await clock.runToLastAsync();
+
+      sandbox.assert.notCalled(handleMessage);
       assert.isFalse(consumer.isRunning);
     });
   });
