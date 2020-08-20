@@ -41,7 +41,7 @@ describe('Consumer', () => {
   let clock;
   let handleMessage;
   let handleMessageBatch;
-  let stopPollerGate;
+  let stopPollingCondition;
   let sqs;
   const response = {
     Messages: [{
@@ -55,7 +55,7 @@ describe('Consumer', () => {
     clock = sinon.useFakeTimers();
     handleMessage = sandbox.stub().resolves(null);
     handleMessageBatch = sandbox.stub().resolves(null);
-    stopPollerGate = sandbox.stub().resolves(null);
+    stopPollingCondition = sandbox.stub().resolves(null);
     sqs = sandbox.mock();
     sqs.receiveMessage = stubResolve(response);
     sqs.deleteMessage = stubResolve();
@@ -755,35 +755,35 @@ describe('Consumer', () => {
     });
   });
 
-  describe('stopPollerGate', () => {
-    it('calls stopPollerGate', async () => {
+  describe('stopPollingCondition', () => {
+    it('calls stopPollingCondition', async () => {
       consumer = new Consumer({
         queueUrl: 'some-queue-url',
         region: 'some-region',
         handleMessage,
-        stopPollerGate,
+        stopPollingCondition,
         sqs
       });
 
-      stopPollerGate.resolves(true);
+      stopPollingCondition.resolves(true);
 
       consumer.start();
       await clock.runToLastAsync();
       consumer.stop();
 
-      sandbox.assert.called(stopPollerGate);
+      sandbox.assert.called(stopPollingCondition);
     });
 
-    it('calls handleMessage and does not stop the consumer if stopPollerGate returns false', async () => {
+    it('calls handleMessage and does not stop the consumer if stopPollingCondition returns false', async () => {
       consumer = new Consumer({
         queueUrl: 'some-queue-url',
         region: 'some-region',
         handleMessage,
-        stopPollerGate,
+        stopPollingCondition,
         sqs
       });
 
-      stopPollerGate.resolves(false);
+      stopPollingCondition.resolves(false);
 
       consumer.start();
       await clock.runToLastAsync();
@@ -794,16 +794,34 @@ describe('Consumer', () => {
       consumer.stop();
     });
 
-    it('does not call handleMessage and stops the consumer if stopPollerGate returns true', async () => {
+    it('does not call sopPollerGate if the consumer is already stopped', async () => {
       consumer = new Consumer({
         queueUrl: 'some-queue-url',
         region: 'some-region',
         handleMessage,
-        stopPollerGate,
+        stopPollingCondition,
         sqs
       });
 
-      stopPollerGate.resolves(true);
+      stopPollingCondition.resolves(true);
+
+      consumer.start();
+      consumer.stop();
+
+      await clock.runToLastAsync();
+      sandbox.assert.calledOnce(stopPollingCondition);
+    });
+
+    it('does not call handleMessage and stops the consumer if stopPollingCondition returns true', async () => {
+      consumer = new Consumer({
+        queueUrl: 'some-queue-url',
+        region: 'some-region',
+        handleMessage,
+        stopPollingCondition,
+        sqs
+      });
+
+      stopPollingCondition.resolves(true);
 
       consumer.start();
       await clock.runToLastAsync();

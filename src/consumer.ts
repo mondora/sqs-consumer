@@ -90,7 +90,7 @@ export interface ConsumerOptions {
   handleMessageTimeout?: number;
   handleMessage?(message: SQSMessage): Promise<void>;
   handleMessageBatch?(messages: SQSMessage[]): Promise<void>;
-  stopPollerGate?(): Promise<boolean>;
+  stopPollingCondition?(): Promise<boolean>;
 }
 
 interface Events {
@@ -108,7 +108,7 @@ export class Consumer extends EventEmitter {
   private queueUrl: string;
   private handleMessage: (message: SQSMessage) => Promise<void>;
   private handleMessageBatch: (message: SQSMessage[]) => Promise<void>;
-  private stopPollerGate: () => Promise<boolean>;
+  private stopPollingCondition: () => Promise<boolean>;
   private handleMessageTimeout: number;
   private attributeNames: string[];
   private messageAttributeNames: string[];
@@ -128,7 +128,7 @@ export class Consumer extends EventEmitter {
     this.queueUrl = options.queueUrl;
     this.handleMessage = options.handleMessage;
     this.handleMessageBatch = options.handleMessageBatch;
-    this.stopPollerGate = options.stopPollerGate;
+    this.stopPollingCondition = options.stopPollingCondition;
     this.handleMessageTimeout = options.handleMessageTimeout;
     this.attributeNames = options.attributeNames || [];
     this.messageAttributeNames = options.messageAttributeNames || [];
@@ -301,8 +301,8 @@ export class Consumer extends EventEmitter {
   }
 
   private async poll(): Promise<void> {
-    if (this.stopPollerGate) {
-      this.stopped = await this.stopPollerGate();
+    if (!this.stopped && this.stopPollingCondition) {
+      this.stopped = await this.stopPollingCondition();
     }
 
     if (this.stopped) {
